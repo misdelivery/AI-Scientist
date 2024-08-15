@@ -27,14 +27,9 @@ def print_time():
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Run AI scientist experiments")
     parser.add_argument(
-        "--skip-idea-generation",
-        action="store_true",
-        help="Skip idea generation and load existing ideas",
-    )
-    parser.add_argument(
         "--skip-novelty-check",
         action="store_true",
-        help="Skip novelty check and use existing ideas",
+        help="Skip novelty check and use existing ideas from ideas.json",
     )
     # add type of experiment (nanoGPT, Boston, etc.)
     parser.add_argument(
@@ -75,10 +70,10 @@ def parse_arguments():
         help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, all available GPUs will be used.",
     )
     parser.add_argument(
-        "--num-ideas",
-        type=int,
-        default=50,
-        help="Number of ideas to generate",
+        "--ideas-file",
+        type=str,
+        default=None,
+        help="Path to the ideas.json file. If specified, skip idea generation.",
     )
     return parser.parse_args()
 
@@ -295,26 +290,32 @@ if __name__ == "__main__":
 
     base_dir = osp.join("templates", args.experiment)
     results_dir = osp.join("results", args.experiment)
-    ideas = generate_ideas(
-        base_dir,
-        client=client,
-        model=client_model,
-        skip_generation=args.skip_idea_generation,
-        max_num_generations=args.num_ideas,
-        num_reflections=NUM_REFLECTIONS,
-    )
-    ideas = check_idea_novelty(
-        ideas,
-        base_dir=base_dir,
-        client=client,
-        model=client_model,
-    )
 
-    with open(osp.join(base_dir, "ideas.json"), "w") as f:
-        json.dump(ideas, f, indent=4)
+    if args.ideas_file is not None:
+        with open(args.ideas_file, "r") as f:
+            ideas = json.load(f)
+    else:
+        ideas = generate_ideas(
+            base_dir,
+            client=client,
+            model=client_model,
+            max_num_generations=args.num_ideas,
+            num_reflections=NUM_REFLECTIONS,
+        )
+        with open("ideas.json", "w") as f:
+            json.dump(ideas, f, indent=4)
+    
+    if not args.skip_novelty_check:
+        ideas = check_idea_novelty(
+            ideas,
+            base_dir=base_dir,
+            client=client,
+            model=client_model,
+        )
+        with open("ideas.json", "w") as f:
+            json.dump(ideas, f, indent=4)
 
     novel_ideas = [idea for idea in ideas if idea["novel"]]
-    # novel_ideas = list(reversed(novel_ideas))
 
     if args.parallel > 0:
         print(f"Running {args.parallel} parallel processes")
