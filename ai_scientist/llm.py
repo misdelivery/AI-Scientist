@@ -130,7 +130,7 @@ def get_response_from_llm(
                 ],
             }
         ]
-        response = client.messages.create(
+        response = client.beta.prompt_caching.messages.create(
             model="claude-3-5-sonnet-20240620",
             max_tokens=3000,
             temperature=temperature,
